@@ -18,3 +18,16 @@ Content-Type: application/json
     "account":"yod.pallat@gmail.com",
     "password":"1234"
 }
+
+###
+
+POST http://localhost:9999/todos
+Content-Type: application/json
+
+{
+    "text":"learn Go"
+}
+
+###
+GET http://localhost:9999/todos
+Content-Type: application/json

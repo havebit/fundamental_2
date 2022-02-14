@@ -7,14 +7,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"golang.org/x/time/rate"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/joho/godotenv"
+	"github.com/pallat/hello/todo"
 )
 
 const defaultPort = ":8081"
@@ -38,6 +42,14 @@ func main() {
 		port = p
 	}
 
+	dsn := "host=localhost user=postgres password=mysecretpassword dbname=myapp port=5432"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Panic(err)
+	}
+
+	db.AutoMigrate(&todo.Todo{})
+
 	limiter := rate.NewLimiter(5, 5)
 
 	r := gin.Default()
@@ -55,6 +67,12 @@ func main() {
 	})
 	r.POST("/ping/:id", pingPongHandler)
 	r.POST("/logins", loginHandler)
+
+	todoHandler := todo.NewHandler(db)
+
+	protecRoutes := r.Group("", authMiddleware)
+	protecRoutes.POST("/todos", todoHandler.CreateTodoHandler)
+	protecRoutes.GET("/todos", todoHandler.ListTodoHandler)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -129,4 +147,26 @@ func pingPongHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": person.Name + " " + c.Param("id"),
 	})
+}
+
+func authMiddleware(c *gin.Context) {
+	bearer := c.Request.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(bearer, "Bearer ")
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return []byte("AllYourBase"), nil
+	})
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		fmt.Println(claims["aud"])
+	}
+
+	c.Next()
 }
