@@ -1,4 +1,20 @@
-GET http://localhost:8081/hello
+POST http://localhost:8081/ping/123
+Content-Type: application/json
+
+{
+    "name":""
+}
+
 
 ###
 GET http://localhost:8081/foobar/2
+
+###
+
+POST http://localhost:8081/logins
+Content-Type: application/json
+
+{
+    "account":"yod.pallat@gmail.com",
+    "password":"1234"
+}
